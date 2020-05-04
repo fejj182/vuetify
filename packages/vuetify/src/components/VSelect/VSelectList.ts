@@ -63,6 +63,7 @@ export default mixins(Colorable, Themeable).extend({
       default: 'value',
     },
     noDataText: String,
+    filter: Function,
     noFilter: Boolean,
     searchInput: null as unknown as PropType<any>,
     selectedItems: {
@@ -111,12 +112,12 @@ export default mixins(Colorable, Themeable).extend({
     genDivider (props: { [key: string]: any }) {
       return this.$createElement(VDivider, { props })
     },
-    genFilteredText (text: string) {
+    genFilteredText (item: object, text: string) {
       text = text || ''
 
       if (!this.searchInput || this.noFilter) return escapeHTML(text)
 
-      const { start, middle, end } = this.getMaskedCharacters(text)
+      const { start, middle, end } = this.getMaskedCharacters(item, text)
 
       return `${escapeHTML(start)}${this.genHighlight(middle)}${escapeHTML(end)}`
     },
@@ -134,8 +135,19 @@ export default mixins(Colorable, Themeable).extend({
       middle: string
       end: string
     } {
-      const searchInput = (this.searchInput || '').toString().toLocaleLowerCase()
-      const index = text.toLocaleLowerCase().indexOf(searchInput)
+      const searchInput = String(this.searchInput || '')
+      const range: boolean | [number, number] = this.filter(item, searchInput, text)
+
+      if (Array.isArray(range)) {
+        return {
+          start: text.slice(0, range[0]),
+          middle: text.slice(range[0], range[1]),
+          end: text.slice(range[1]),
+        }
+      }
+      // If no range specified, use same filtering
+      // as VAutocomplete's default filter function
+      const index = text.toLocaleLowerCase().indexOf(searchInput.toLocaleLowerCase())
 
       if (index < 0) return { start: '', middle: text, end: '' }
 
@@ -206,7 +218,7 @@ export default mixins(Colorable, Themeable).extend({
         : scopedSlot
     },
     genTileContent (item: any, index = 0): VNode {
-      const innerHTML = this.genFilteredText(this.getText(item))
+      const innerHTML = this.genFilteredText(item, this.getText(item))
 
       return this.$createElement(VListItemContent,
         [this.$createElement(VListItemTitle, {
